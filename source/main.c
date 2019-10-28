@@ -17,8 +17,9 @@ volatile unsigned char TimerFlag = 0; //TimerISR() sets this to 1, C program cle
 //variables for mapping AVR TSR
 unsigned long _avr_timer_M = 1; //start count from here down to zero, default = 1ms
 unsigned long _avr_timer_cntcurr = 0; //internal count of ticks (1ms)
+unsigned char tmpA = 0X00L //INT variable for input
 unsigned char tmpB = 0x00; //initializes variable
-enum States{start, lightA, lightB, lightC}state;
+enum States{start, lightA, waitA, lightB, waitB, lightC, waitC}state;
 
 void TimerOn() {
 	//avr timer/cnter
@@ -67,13 +68,44 @@ void lightTick(){
 			state = lightA;
 			break;
 		case lightA:
+			if(tmpA){
+				state = waitA; //if button is pressed during light A
+			}
+			else{ //if no button is pressed light switches
 			state = lightB;
+			}
+			break;
+		case waitA:
+			if(tmpA){
+				state = lightA;
+			}
+			else{
+				state = waitA;
+			}
 			break;
 		case lightB:
-			state = lightC;
+			if(tmpA){
+				state = waitB; //if button pressed
+			}
+			else{
+				state = lightC;
+			}
+			break;
+		case waitB:
+			if(tmpA){
+				state = lightB;
+			}
+			else{
+				state = waitB;
+			}
 			break;
 		case light C:
+			if(tmpA){
+				state = waitC;
+			}
+			else{ //starts back at light 1
 			state = lightA;
+			}
 			break;
 	}
 	switch(state)
@@ -81,24 +113,33 @@ void lightTick(){
 		case lightA:
 			tmpB = 0x01;
 			break;
+		case waitA:
+			tmpB = 0x01;
+			break;
 		case lightB:
 			tmpB = 0x02;
 			break;
+		case waitB:
+			tmpB = 0x02;
+			break;
 		case lightC:
+			tmpB = 0x04;
+			break;
+		case waitC:
 			tmpB = 0x04;
 			break;
 	}
 }
 int main(void) {
     /* Insert DDR and PORT initializations */
-	DDRB = 0xFF; //set port b to output
-	PORTB = 0x00; //init port B to 0s
-	TimerSet(1000);
+	DDRA = 0x00; PORTA = 0xFF; //initialize DDRA as inputs
+	DDRB = 0xFF; PORTB = 0x00; //init port B to 0s and outputs
+	TimerSet(300); //leds timer light for 300ms
 	TimerOn();
-	unsigned char tmpB = 0x00;
 	state = start;
     /* Insert your solution below */
     while (1) {
+	tmpA = ~PINA & 0x08;
 	lightTick();
 	while (!TimerFlag); //wait 1 seec
 	TimerFlag = 0;
